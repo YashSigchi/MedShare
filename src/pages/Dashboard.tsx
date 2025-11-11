@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -11,101 +12,110 @@ import {
   TrendingUp,
   Users,
   Heart,
+  Loader,
 } from 'lucide-react';
 import MedicineCard from '../components/MedicineCard';
 import NotificationCard from '../components/NotificationCard';
+import { medicineAPI, notificationAPI, getImageUrl } from '../utils/api';
 
 interface DashboardProps {
   userRole: 'donor' | 'receiver' | 'verifier';
 }
 
 function Dashboard({ userRole }: DashboardProps) {
-  const donorMedicines = [
-    {
-      id: '1',
-      name: 'Amoxicillin 500mg',
-      manufacturer: 'Pfizer',
-      expiryDate: '2025-12-31',
-      quantity: 30,
-      condition: 'New' as const,
-      status: 'Approved' as const,
-    },
-    {
-      id: '2',
-      name: 'Ibuprofen 200mg',
-      manufacturer: 'Generic Labs',
-      expiryDate: '2025-08-15',
-      quantity: 50,
-      condition: 'Opened' as const,
-      status: 'Pending' as const,
-    },
-  ];
+  const [donorMedicines, setDonorMedicines] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const receiverRequests = [
-    {
-      id: '1',
-      name: 'Metformin 1000mg',
-      manufacturer: 'Novartis',
-      expiryDate: '2026-03-20',
-      quantity: 60,
-      condition: 'New' as const,
-      status: 'Approved' as const,
-      donorName: 'Sarah Johnson',
-    },
-    {
-      id: '2',
-      name: 'Lisinopril 10mg',
-      manufacturer: 'Teva',
-      expiryDate: '2025-11-10',
-      quantity: 30,
-      condition: 'New' as const,
-      status: 'Pending' as const,
-      donorName: 'Michael Chen',
-    },
-  ];
+  useEffect(() => {
+    fetchData();
+  }, [userRole]);
 
-  const notifications = [
-    {
-      id: '1',
-      type: 'success' as const,
-      title: 'Donation Approved',
-      message: 'Your Amoxicillin donation has been approved and is now visible in the marketplace.',
-      timestamp: '2 hours ago',
-    },
-    {
-      id: '2',
-      type: 'info' as const,
-      title: 'New Request Received',
-      message: 'Someone has requested your donated Ibuprofen. Check your dashboard for details.',
-      timestamp: '5 hours ago',
-    },
-    {
-      id: '3',
-      type: 'warning' as const,
-      title: 'Verification Pending',
-      message: 'Your recent upload is awaiting verification. This usually takes 24-48 hours.',
-      timestamp: '1 day ago',
-    },
-  ];
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      
+      if (userRole === 'donor') {
+        const medResponse = await medicineAPI.getMyUploads();
+        const formattedMedicines = medResponse.data.map((med: any) => ({
+          id: med._id,
+          name: med.name,
+          manufacturer: med.manufacturer,
+          expiryDate: new Date(med.expiryDate).toISOString().split('T')[0],
+          quantity: med.quantity,
+          condition: med.condition,
+          status: med.status,
+          imageUrl: getImageUrl(med.photo),
+        }));
+        setDonorMedicines(formattedMedicines);
+      }
+
+      const notifResponse = await notificationAPI.getAll();
+      const formattedNotifications = notifResponse.data.slice(0, 3).map((notif: any) => ({
+        id: notif._id,
+        type: notif.type || 'info',
+        title: notif.message.split(':')[0] || notif.message.substring(0, 30),
+        message: notif.message,
+        timestamp: formatTimestamp(notif.createdAt),
+      }));
+      setNotifications(formattedNotifications);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatTimestamp = (date: string) => {
+    const now = new Date();
+    const notifDate = new Date(date);
+    const diffInSeconds = Math.floor((now.getTime() - notifDate.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return notifDate.toLocaleDateString();
+  };
 
   const stats = {
     donor: [
-      { label: 'Total Donations', value: '12', icon: Package, color: 'blue' },
-      { label: 'Approved', value: '8', icon: CheckCircle, color: 'green' },
-      { label: 'Pending', value: '3', icon: Clock, color: 'yellow' },
-      { label: 'Lives Impacted', value: '24', icon: Heart, color: 'red' },
+      { 
+        label: 'Total Donations', 
+        value: donorMedicines.length.toString(), 
+        icon: Package, 
+        color: 'blue' 
+      },
+      { 
+        label: 'Approved', 
+        value: donorMedicines.filter(m => m.status === 'Approved').length.toString(), 
+        icon: CheckCircle, 
+        color: 'green' 
+      },
+      { 
+        label: 'Pending', 
+        value: donorMedicines.filter(m => m.status === 'Pending').length.toString(), 
+        icon: Clock, 
+        color: 'yellow' 
+      },
+      { 
+        label: 'Lives Impacted', 
+        value: donorMedicines.filter(m => m.status === 'Approved').length * 2 + '', 
+        icon: Heart, 
+        color: 'red' 
+      },
     ],
     receiver: [
-      { label: 'Requests Made', value: '8', icon: Search, color: 'blue' },
-      { label: 'Approved', value: '5', icon: CheckCircle, color: 'green' },
-      { label: 'Pending', value: '2', icon: Clock, color: 'yellow' },
-      { label: 'Received', value: '5', icon: Package, color: 'green' },
+      { label: 'Requests Made', value: '0', icon: Search, color: 'blue' },
+      { label: 'Approved', value: '0', icon: CheckCircle, color: 'green' },
+      { label: 'Pending', value: '0', icon: Clock, color: 'yellow' },
+      { label: 'Received', value: '0', icon: Package, color: 'green' },
     ],
     verifier: [
-      { label: 'Total Reviews', value: '156', icon: TrendingUp, color: 'blue' },
-      { label: 'Approved', value: '142', icon: CheckCircle, color: 'green' },
-      { label: 'Rejected', value: '14', icon: XCircle, color: 'red' },
-      { label: 'Pending', value: '8', icon: Clock, color: 'yellow' },
+      { label: 'Total Reviews', value: '0', icon: TrendingUp, color: 'blue' },
+      { label: 'Approved', value: '0', icon: CheckCircle, color: 'green' },
+      { label: 'Rejected', value: '0', icon: XCircle, color: 'red' },
+      { label: 'Pending', value: '0', icon: Clock, color: 'yellow' },
     ],
   };
 
@@ -194,20 +204,34 @@ function Dashboard({ userRole }: DashboardProps) {
                 )}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                {userRole === 'donor' &&
-                  donorMedicines.map((med) => (
-                    <MedicineCard key={med.id} {...med} />
-                  ))}
-                {userRole === 'receiver' &&
-                  receiverRequests.map((med) => (
-                    <MedicineCard key={med.id} {...med} />
-                  ))}
-                {userRole === 'verifier' &&
-                  donorMedicines.map((med) => (
-                    <MedicineCard key={med.id} {...med} />
-                  ))}
-              </div>
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <Loader className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" />
+                  <p className="text-gray-600">Loading...</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {userRole === 'donor' && donorMedicines.length > 0 &&
+                    donorMedicines.slice(0, 2).map((med) => (
+                      <MedicineCard key={med.id} {...med} />
+                    ))}
+                  {userRole === 'donor' && donorMedicines.length === 0 && (
+                    <div className="col-span-2 text-center py-8 text-gray-600">
+                      No medicines uploaded yet. <Link to="/upload" className="text-blue-600 hover:underline">Upload your first medicine</Link>
+                    </div>
+                  )}
+                  {userRole === 'receiver' && (
+                    <div className="col-span-2 text-center py-8 text-gray-600">
+                      Browse the <Link to="/marketplace" className="text-blue-600 hover:underline">marketplace</Link> to request medicines.
+                    </div>
+                  )}
+                  {userRole === 'verifier' && (
+                    <div className="col-span-2 text-center py-8 text-gray-600">
+                      Visit the <Link to="/verify" className="text-blue-600 hover:underline">verification page</Link> to review pending medicines.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -222,11 +246,21 @@ function Dashboard({ userRole }: DashboardProps) {
                   View All
                 </Link>
               </div>
-              <div className="space-y-4">
-                {notifications.slice(0, 3).map((notification) => (
-                  <NotificationCard key={notification.id} {...notification} />
-                ))}
-              </div>
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <Loader className="animate-spin h-6 w-6 mx-auto text-blue-500 mb-2" />
+                </div>
+              ) : notifications.length > 0 ? (
+                <div className="space-y-4">
+                  {notifications.map((notification) => (
+                    <NotificationCard key={notification.id} {...notification} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-600 text-sm">
+                  No notifications yet
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

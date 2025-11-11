@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Upload as UploadIcon, Image, Calendar, Package, Info, CheckCircle, Loader } from 'lucide-react';
+import { medicineAPI } from '../utils/api';
 
 function Upload() {
   const navigate = useNavigate();
@@ -27,18 +28,37 @@ function Upload() {
     }
   };
 
+  const [error, setError] = useState('');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setIsSubmitting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('manufacturer', formData.manufacturer);
+      formDataToSend.append('expiryDate', formData.expiryDate);
+      formDataToSend.append('quantity', formData.quantity);
+      formDataToSend.append('condition', formData.condition);
 
-    setIsSubmitting(false);
-    setShowSuccess(true);
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput?.files?.[0]) {
+        formDataToSend.append('photo', fileInput.files[0]);
+      }
 
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 3000);
+      await medicineAPI.upload(formDataToSend);
+      setIsSubmitting(false);
+      setShowSuccess(true);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Upload failed. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -92,6 +112,12 @@ function Upload() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
                 <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-blue-800">

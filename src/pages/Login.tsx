@@ -3,20 +3,34 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, Mail, Lock, LogIn } from 'lucide-react';
 
+import { authAPI } from '../utils/api';
+
 interface LoginProps {
-  onLogin: (role: 'donor' | 'receiver' | 'verifier') => void;
+  onLogin: (userData: { role: string; token: string; name: string; email: string; _id: string }) => void;
 }
 
 function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'donor' | 'receiver' | 'verifier'>('donor');
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(role);
-    navigate('/dashboard');
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await authAPI.login({ email, password });
+      onLogin(response.data);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -108,20 +122,11 @@ function Login({ onLogin }: LoginProps) {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Role
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as 'donor' | 'receiver' | 'verifier')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                <option value="donor">Donor</option>
-                <option value="receiver">Receiver</option>
-                <option value="verifier">Verifier</option>
-              </select>
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <label className="flex items-center">
@@ -135,10 +140,11 @@ function Login({ onLogin }: LoginProps) {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               <LogIn className="mr-2 h-5 w-5" />
-              Sign In
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </button>
 
             <div className="text-center">

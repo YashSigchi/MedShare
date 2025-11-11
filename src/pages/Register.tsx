@@ -3,8 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, Mail, Lock, User as UserIcon, UserPlus } from 'lucide-react';
 
+import { authAPI } from '../utils/api';
+
 interface RegisterProps {
-  onRegister: (role: 'donor' | 'receiver' | 'verifier') => void;
+  onRegister: (userData: { role: string; token: string; name: string; email: string; _id: string }) => void;
 }
 
 function Register({ onRegister }: RegisterProps) {
@@ -15,14 +17,34 @@ function Register({ onRegister }: RegisterProps) {
   const [role, setRole] = useState<'donor' | 'receiver' | 'verifier'>('donor');
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
     if (password !== confirmPassword) {
-      alert('Passwords do not match!');
+      setError('Passwords do not match!');
       return;
     }
-    onRegister(role);
-    navigate('/dashboard');
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await authAPI.register({ name: fullName, email, password, role });
+      onRegister(response.data);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -172,6 +194,12 @@ function Register({ onRegister }: RegisterProps) {
               </select>
             </div>
 
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
             <div className="flex items-start">
               <input type="checkbox" className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500" required />
               <label className="ml-2 text-sm text-gray-600">
@@ -188,10 +216,11 @@ function Register({ onRegister }: RegisterProps) {
 
             <button
               type="submit"
-              className="w-full flex items-center justify-center py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               <UserPlus className="mr-2 h-5 w-5" />
-              Create Account
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </button>
 
             <div className="text-center">

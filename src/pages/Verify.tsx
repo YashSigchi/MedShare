@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, Shield, Calendar, Package, User, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Shield, Calendar, Package, User, AlertCircle, Loader } from 'lucide-react';
+import { verifyAPI } from '../utils/api';
 
 interface Medicine {
   id: string;
@@ -20,57 +21,43 @@ interface Medicine {
 }
 
 function Verify() {
-  const [medicines, setMedicines] = useState<Medicine[]>([
-    {
-      id: '1',
-      name: 'Amoxicillin 500mg',
-      manufacturer: 'Pfizer',
-      expiryDate: '2025-12-31',
-      quantity: 30,
-      condition: 'New',
-      donorName: 'Sarah Johnson',
-      uploadDate: '2024-01-15',
-      aiVerification: {
-        expiryValid: true,
-        conditionGood: true,
-        confidence: 95,
-      },
-    },
-    {
-      id: '2',
-      name: 'Ibuprofen 200mg',
-      manufacturer: 'Generic Labs',
-      expiryDate: '2025-03-20',
-      quantity: 50,
-      condition: 'Opened',
-      donorName: 'Michael Chen',
-      uploadDate: '2024-01-14',
-      aiVerification: {
-        expiryValid: true,
-        conditionGood: true,
-        confidence: 88,
-      },
-    },
-    {
-      id: '3',
-      name: 'Aspirin 100mg',
-      manufacturer: 'Bayer',
-      expiryDate: '2024-02-10',
-      quantity: 20,
-      condition: 'New',
-      donorName: 'Emily Rodriguez',
-      uploadDate: '2024-01-13',
-      aiVerification: {
-        expiryValid: false,
-        conditionGood: true,
-        confidence: 92,
-      },
-    },
-  ]);
-
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [action, setAction] = useState<'approve' | 'reject' | null>(null);
+  const [verificationNotes, setVerificationNotes] = useState('');
+
+  useEffect(() => {
+    fetchMedicines();
+  }, []);
+
+  const fetchMedicines = async () => {
+    try {
+      setIsLoading(true);
+      const response = await verifyAPI.getPending();
+      const formattedMedicines = response.data.map((med: any) => ({
+        id: med._id,
+        name: med.name,
+        manufacturer: med.manufacturer,
+        expiryDate: new Date(med.expiryDate).toISOString().split('T')[0],
+        quantity: med.quantity,
+        condition: med.condition,
+        donorName: med.donor?.name || 'Unknown',
+        uploadDate: new Date(med.createdAt).toISOString().split('T')[0],
+        aiVerification: med.aiVerification || {
+          expiryValid: true,
+          conditionGood: true,
+          confidence: 85,
+        },
+      }));
+      setMedicines(formattedMedicines);
+    } catch (error) {
+      console.error('Error fetching medicines:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAction = (medicine: Medicine, actionType: 'approve' | 'reject') => {
     setSelectedMedicine(medicine);
@@ -78,12 +65,22 @@ function Verify() {
     setShowModal(true);
   };
 
-  const confirmAction = () => {
-    if (selectedMedicine) {
-      setMedicines(medicines.filter((m) => m.id !== selectedMedicine.id));
-      setShowModal(false);
-      setSelectedMedicine(null);
-      setAction(null);
+  const confirmAction = async () => {
+    if (selectedMedicine && action) {
+      try {
+        await verifyAPI.verify(selectedMedicine.id, {
+          status: action === 'approve' ? 'Approved' : 'Rejected',
+          verificationNotes,
+        });
+        setMedicines(medicines.filter((m) => m.id !== selectedMedicine.id));
+        setShowModal(false);
+        setSelectedMedicine(null);
+        setAction(null);
+        setVerificationNotes('');
+      } catch (error) {
+        console.error('Error verifying medicine:', error);
+        alert('Failed to verify medicine. Please try again.');
+      }
     }
   };
 
@@ -130,8 +127,18 @@ function Verify() {
             <h2 className="text-2xl font-bold text-gray-900">Pending Verifications</h2>
           </div>
 
-          <div className="divide-y divide-gray-200">
-            {medicines.map((medicine) => (
+          {isLoading ? (
+            <div className="p-12 text-center">
+              <Loader className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" />
+              <p className="text-gray-600">Loading pending medicines...</p>
+            </div>
+          ) : medicines.length === 0 ? (
+            <div className="p-12 text-center">
+              <p className="text-gray-600">No pending verifications</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {medicines.map((medicine) => (
               <motion.div
                 key={medicine.id}
                 initial={{ opacity: 0 }}
@@ -237,7 +244,8 @@ function Verify() {
                 </div>
               </motion.div>
             ))}
-          </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
@@ -264,6 +272,18 @@ function Verify() {
                   ? `You are about to approve ${selectedMedicine.name}. This will make it available in the marketplace.`
                   : `You are about to reject ${selectedMedicine.name}. The donor will be notified of this decision.`}
               </p>
+              <div className="mt-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Verification Notes (Optional)
+                </label>
+                <textarea
+                  value={verificationNotes}
+                  onChange={(e) => setVerificationNotes(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Add any notes about this verification..."
+                />
+              </div>
             </div>
             <div className="flex gap-4">
               <button

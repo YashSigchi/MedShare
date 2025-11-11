@@ -1,84 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Filter, MapPin } from 'lucide-react';
+import { Search, Filter, MapPin, Loader } from 'lucide-react';
 import MedicineCard from '../components/MedicineCard';
+import { marketplaceAPI, getImageUrl } from '../utils/api';
 
 function Marketplace() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCondition, setSelectedCondition] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const medicines = [
-    {
-      id: '1',
-      name: 'Amoxicillin 500mg',
-      manufacturer: 'Pfizer',
-      expiryDate: '2025-12-31',
-      quantity: 30,
-      condition: 'New' as const,
-      donorName: 'Sarah Johnson',
-      location: 'New York, NY',
-    },
-    {
-      id: '2',
-      name: 'Metformin 1000mg',
-      manufacturer: 'Novartis',
-      expiryDate: '2026-03-20',
-      quantity: 60,
-      condition: 'New' as const,
-      donorName: 'Michael Chen',
-      location: 'Los Angeles, CA',
-    },
-    {
-      id: '3',
-      name: 'Ibuprofen 200mg',
-      manufacturer: 'Generic Labs',
-      expiryDate: '2025-08-15',
-      quantity: 50,
-      condition: 'Opened' as const,
-      donorName: 'Emily Rodriguez',
-      location: 'Chicago, IL',
-    },
-    {
-      id: '4',
-      name: 'Lisinopril 10mg',
-      manufacturer: 'Teva',
-      expiryDate: '2025-11-10',
-      quantity: 30,
-      condition: 'New' as const,
-      donorName: 'David Kim',
-      location: 'Houston, TX',
-    },
-    {
-      id: '5',
-      name: 'Atorvastatin 20mg',
-      manufacturer: 'Lipitor',
-      expiryDate: '2026-01-25',
-      quantity: 45,
-      condition: 'New' as const,
-      donorName: 'Jennifer Lee',
-      location: 'Phoenix, AZ',
-    },
-    {
-      id: '6',
-      name: 'Omeprazole 40mg',
-      manufacturer: 'AstraZeneca',
-      expiryDate: '2025-09-30',
-      quantity: 28,
-      condition: 'Opened' as const,
-      donorName: 'Robert Taylor',
-      location: 'Philadelphia, PA',
-    },
-  ];
+  useEffect(() => {
+    fetchMedicines();
+  }, [searchQuery, selectedCondition]);
 
-  const filteredMedicines = medicines.filter((medicine) => {
-    const matchesSearch = medicine.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         medicine.manufacturer.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCondition = selectedCondition === 'all' || medicine.condition.toLowerCase() === selectedCondition;
-    return matchesSearch && matchesCondition;
-  });
+  const fetchMedicines = async () => {
+    try {
+      setIsLoading(true);
+      const params: any = {};
+      if (searchQuery) params.search = searchQuery;
+      if (selectedCondition !== 'all') params.condition = selectedCondition;
+      
+      const response = await marketplaceAPI.getAll(params);
+      const formattedMedicines = response.data.map((med: any) => ({
+        id: med._id,
+        name: med.name,
+        manufacturer: med.manufacturer,
+        expiryDate: new Date(med.expiryDate).toISOString().split('T')[0],
+        quantity: med.quantity,
+        condition: med.condition,
+        donorName: med.donor?.name || 'Unknown',
+        imageUrl: getImageUrl(med.photo),
+      }));
+      setMedicines(formattedMedicines);
+    } catch (error) {
+      console.error('Error fetching medicines:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredMedicines = medicines;
 
   const handleRequest = (id: string) => {
     navigate(`/request/${id}`);
@@ -184,20 +149,27 @@ function Marketplace() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMedicines.map((medicine, index) => (
-            <motion.div
-              key={medicine.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <MedicineCard {...medicine} onRequest={handleRequest} />
-            </motion.div>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="text-center py-16">
+            <Loader className="animate-spin h-12 w-12 mx-auto text-blue-500 mb-4" />
+            <p className="text-gray-600">Loading medicines...</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredMedicines.map((medicine, index) => (
+              <motion.div
+                key={medicine.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <MedicineCard {...medicine} onRequest={handleRequest} />
+              </motion.div>
+            ))}
+          </div>
+        )}
 
-        {filteredMedicines.length === 0 && (
+        {!isLoading && filteredMedicines.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

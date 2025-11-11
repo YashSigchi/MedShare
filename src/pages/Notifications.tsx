@@ -1,65 +1,57 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Loader } from 'lucide-react';
 import NotificationCard from '../components/NotificationCard';
+import { notificationAPI } from '../utils/api';
 
 function Notifications() {
-  const notifications = [
-    {
-      id: '1',
-      type: 'success' as const,
-      title: 'Donation Approved',
-      message: 'Your Amoxicillin 500mg donation has been approved and is now visible in the marketplace.',
-      timestamp: '2 hours ago',
-      isRead: false,
-    },
-    {
-      id: '2',
-      type: 'info' as const,
-      title: 'New Request Received',
-      message: 'Someone has requested your donated Ibuprofen. Check your dashboard for details.',
-      timestamp: '5 hours ago',
-      isRead: false,
-    },
-    {
-      id: '3',
-      type: 'warning' as const,
-      title: 'Verification Pending',
-      message: 'Your recent upload is awaiting verification. This usually takes 24-48 hours.',
-      timestamp: '1 day ago',
-      isRead: true,
-    },
-    {
-      id: '4',
-      type: 'success' as const,
-      title: 'Request Approved',
-      message: 'Your request for Metformin 1000mg has been approved. The donor will contact you soon.',
-      timestamp: '2 days ago',
-      isRead: true,
-    },
-    {
-      id: '5',
-      type: 'info' as const,
-      title: 'Welcome to MedShare',
-      message: 'Thank you for joining our community. Start by browsing available medicines or uploading a donation.',
-      timestamp: '3 days ago',
-      isRead: true,
-    },
-    {
-      id: '6',
-      type: 'error' as const,
-      title: 'Upload Rejected',
-      message: 'Your upload for Aspirin was rejected due to expiry date being too close. Please upload medicines with at least 3 months validity.',
-      timestamp: '4 days ago',
-      isRead: true,
-    },
-    {
-      id: '7',
-      type: 'success' as const,
-      title: 'Pickup Confirmed',
-      message: 'Your pickup for Lisinopril 10mg has been confirmed for tomorrow at 2 PM.',
-      timestamp: '5 days ago',
-      isRead: true,
-    },
-  ];
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setIsLoading(true);
+      const response = await notificationAPI.getAll();
+      const formattedNotifications = response.data.map((notif: any) => ({
+        id: notif._id,
+        type: notif.type || 'info',
+        title: notif.message.split(':')[0] || notif.message.substring(0, 30),
+        message: notif.message,
+        timestamp: formatTimestamp(notif.createdAt),
+        isRead: notif.read,
+      }));
+      setNotifications(formattedNotifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatTimestamp = (date: string) => {
+    const now = new Date();
+    const notifDate = new Date(date);
+    const diffInSeconds = Math.floor((now.getTime() - notifDate.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return notifDate.toLocaleDateString();
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationAPI.markAllAsRead();
+      setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -91,13 +83,22 @@ function Notifications() {
                 </p>
               )}
             </div>
-            <button className="text-sm text-blue-600 hover:text-blue-700 font-semibold">
+            <button 
+              onClick={handleMarkAllAsRead}
+              className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+            >
               Mark all as read
             </button>
           </div>
 
-          <div className="divide-y divide-gray-200">
-            {notifications.map((notification, index) => (
+          {isLoading ? (
+            <div className="p-12 text-center">
+              <Loader className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" />
+              <p className="text-gray-600">Loading notifications...</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {notifications.map((notification, index) => (
               <motion.div
                 key={notification.id}
                 initial={{ opacity: 0, x: -20 }}
@@ -107,8 +108,9 @@ function Notifications() {
               >
                 <NotificationCard {...notification} />
               </motion.div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </motion.div>
 
         {notifications.length === 0 && (

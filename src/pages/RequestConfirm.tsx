@@ -1,36 +1,95 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Package, Calendar, User, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, Calendar, User, MapPin, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { marketplaceAPI, getImageUrl } from '../utils/api';
 
 function RequestConfirm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [medicine, setMedicine] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const medicine = {
-    id: id || '1',
-    name: 'Amoxicillin 500mg',
-    manufacturer: 'Pfizer',
-    expiryDate: '2025-12-31',
-    quantity: 30,
-    condition: 'New',
-    donorName: 'Sarah Johnson',
-    location: 'New York, NY',
-    imageUrl: '',
+  useEffect(() => {
+    if (id) {
+      fetchMedicine();
+    }
+  }, [id]);
+
+  const fetchMedicine = async () => {
+    try {
+      setIsLoading(true);
+      const response = await marketplaceAPI.getAll();
+      const med = response.data.find((m: any) => m._id === id);
+      if (med) {
+        setMedicine({
+          id: med._id,
+          name: med.name,
+          manufacturer: med.manufacturer,
+          expiryDate: new Date(med.expiryDate).toISOString().split('T')[0],
+          quantity: med.quantity,
+          condition: med.condition,
+          donorName: med.donor?.name || 'Unknown',
+          imageUrl: getImageUrl(med.photo),
+        });
+      } else {
+        setError('Medicine not found');
+      }
+    } catch (error) {
+      setError('Failed to load medicine details');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleConfirm = async () => {
+    if (!id) return;
+    
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setShowSuccess(true);
+    setError('');
 
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 3000);
+    try {
+      await marketplaceAPI.request(id);
+      setIsSubmitting(false);
+      setShowSuccess(true);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 3000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to send request. Please try again.');
+      setIsSubmitting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 pt-20 pb-12 flex items-center justify-center">
+        <Loader className="animate-spin h-12 w-12 text-blue-500" />
+      </div>
+    );
+  }
+
+  if (error && !medicine) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 pt-20 pb-12 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => navigate('/marketplace')}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg"
+          >
+            Back to Marketplace
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!medicine) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 pt-20 pb-12">
@@ -153,6 +212,12 @@ function RequestConfirm() {
                   </p>
                 </div>
 
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
+
                 <div className="flex gap-4">
                   <button
                     onClick={() => navigate('/marketplace')}
@@ -163,9 +228,16 @@ function RequestConfirm() {
                   <button
                     onClick={handleConfirm}
                     disabled={isSubmitting}
-                    className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="flex-1 flex items-center justify-center py-3 bg-gradient-to-r from-blue-500 to-green-500 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
-                    {isSubmitting ? 'Sending Request...' : 'Confirm Request'}
+                    {isSubmitting ? (
+                      <>
+                        <Loader className="animate-spin h-5 w-5 mr-2" />
+                        Sending Request...
+                      </>
+                    ) : (
+                      'Confirm Request'
+                    )}
                   </button>
                 </div>
               </div>

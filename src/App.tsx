@@ -19,24 +19,36 @@ function App() {
   const [userRole, setUserRole] = useState<'donor' | 'receiver' | 'verifier' | null>(null);
 
   useEffect(() => {
-    const savedAuth = localStorage.getItem('isAuthenticated');
-    const savedRole = localStorage.getItem('userRole') as 'donor' | 'receiver' | 'verifier' | null;
-    if (savedAuth === 'true' && savedRole) {
-      setIsAuthenticated(true);
-      setUserRole(savedRole);
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (token && savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setIsAuthenticated(true);
+        setUserRole(user.role.toLowerCase() as 'donor' | 'receiver' | 'verifier');
+      } catch (error) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     }
   }, []);
 
-  const handleLogin = (role: 'donor' | 'receiver' | 'verifier') => {
+  const handleLogin = (userData: { role: string; token: string; name: string; email: string; _id: string }) => {
     setIsAuthenticated(true);
+    const role = userData.role.toLowerCase() as 'donor' | 'receiver' | 'verifier';
     setUserRole(role);
+    localStorage.setItem('token', userData.token);
+    localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('isAuthenticated', 'true');
     localStorage.setItem('userRole', role);
   };
 
-  const handleRegister = (role: 'donor' | 'receiver' | 'verifier') => {
+  const handleRegister = (userData: { role: string; token: string; name: string; email: string; _id: string }) => {
     setIsAuthenticated(true);
+    const role = userData.role.toLowerCase() as 'donor' | 'receiver' | 'verifier';
     setUserRole(role);
+    localStorage.setItem('token', userData.token);
+    localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('isAuthenticated', 'true');
     localStorage.setItem('userRole', role);
   };
@@ -44,6 +56,8 @@ function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setUserRole(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('userRole');
   };
