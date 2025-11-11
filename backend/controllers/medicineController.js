@@ -13,7 +13,12 @@ export const uploadMedicine = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Please provide all required fields' });
   }
 
-  const photo = req.file ? `/uploads/${req.file.filename}` : '';
+  // Check if file was uploaded
+  if (!req.file) {
+    return res.status(400).json({ message: 'Please upload a medicine photo' });
+  }
+
+  const photo = `/uploads/${req.file.filename}`;
 
   const medicine = await Medicine.create({
     name,

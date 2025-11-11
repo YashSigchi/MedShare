@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Shield, Calendar, Package, User, AlertCircle, Loader } from 'lucide-react';
-import { verifyAPI } from '../utils/api';
+import { verifyAPI, getImageUrl } from '../utils/api';
 
 interface Medicine {
   id: string;
@@ -43,6 +43,7 @@ function Verify() {
         expiryDate: new Date(med.expiryDate).toISOString().split('T')[0],
         quantity: med.quantity,
         condition: med.condition,
+        imageUrl: getImageUrl(med.photo),
         donorName: med.donor?.name || 'Unknown',
         uploadDate: new Date(med.createdAt).toISOString().split('T')[0],
         aiVerification: med.aiVerification || {
@@ -147,8 +148,21 @@ function Verify() {
               >
                 <div className="grid lg:grid-cols-12 gap-6">
                   <div className="lg:col-span-3">
-                    <div className="h-48 bg-gradient-to-br from-blue-50 to-green-50 rounded-lg flex items-center justify-center">
-                      <Package className="h-20 w-20 text-blue-300" />
+                    <div className="h-48 bg-gradient-to-br from-blue-50 to-green-50 rounded-lg overflow-hidden">
+                      {medicine.imageUrl ? (
+                        <img
+                          src={medicine.imageUrl}
+                          alt={medicine.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <Package className="h-20 w-20 text-blue-300" />
+                        </div>
+                      )}
                     </div>
                   </div>
 

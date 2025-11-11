@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Upload as UploadIcon, Image, Calendar, Package, Info, CheckCircle, Loader } from 'lucide-react';
@@ -6,9 +6,11 @@ import { medicineAPI } from '../utils/api';
 
 function Upload() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     manufacturer: '',
@@ -20,6 +22,7 @@ function Upload() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewImage(reader.result as string);
@@ -28,11 +31,27 @@ function Upload() {
     }
   };
 
+  const handleRemoveImage = () => {
+    setPreviewImage(null);
+    setSelectedFile(null);
+    // Reset the file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    // Validate that a file is selected
+    if (!selectedFile) {
+      setError('Please upload a medicine photo');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -42,11 +61,7 @@ function Upload() {
       formDataToSend.append('expiryDate', formData.expiryDate);
       formDataToSend.append('quantity', formData.quantity);
       formDataToSend.append('condition', formData.condition);
-
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      if (fileInput?.files?.[0]) {
-        formDataToSend.append('photo', fileInput.files[0]);
-      }
+      formDataToSend.append('photo', selectedFile);
 
       await medicineAPI.upload(formDataToSend);
       setIsSubmitting(false);
@@ -225,33 +240,41 @@ function Upload() {
                         alt="Preview"
                         className="max-h-64 mx-auto rounded-lg"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setPreviewImage(null)}
-                        className="mt-4 text-sm text-red-600 hover:text-red-700 font-semibold"
-                      >
-                        Remove Image
-                      </button>
+                      <div className="mt-4 flex gap-4 justify-center">
+                        <label htmlFor="photo-input" className="cursor-pointer text-sm text-blue-600 hover:text-blue-700 font-semibold">
+                          Change Image
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleRemoveImage}
+                          className="text-sm text-red-600 hover:text-red-700 font-semibold"
+                        >
+                          Remove Image
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div>
                       <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <label className="cursor-pointer">
+                      <label htmlFor="photo-input" className="cursor-pointer">
                         <span className="text-blue-600 hover:text-blue-700 font-semibold">
                           Click to upload
                         </span>
                         <span className="text-gray-600"> or drag and drop</span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          required
-                        />
                       </label>
                       <p className="text-xs text-gray-500 mt-2">PNG, JPG up to 10MB</p>
                     </div>
                   )}
+                  {/* Always keep file input accessible for form validation */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    id="photo-input"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    required
+                  />
                 </div>
               </div>
 

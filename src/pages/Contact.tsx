@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, Clock, MessageCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Clock, MessageCircle, ExternalLink } from 'lucide-react';
 
 function Contact() {
   const [formData, setFormData] = useState({
@@ -234,10 +234,38 @@ function Contact() {
               </div>
 
               <div className="bg-gradient-to-br from-blue-100 to-green-100 rounded-xl p-8">
-                <div className="h-64 bg-white rounded-lg flex items-center justify-center">
-                  <MapPin className="h-32 w-32 text-blue-300" />
+                {/* Map holder with image and hover overlay */}
+                <div className="group relative h-64 bg-white rounded-lg overflow-hidden">
+                  {/* Map image source: configurable via env, falls back to a generic map image */}
+                  {(() => {
+                    const mapImageUrl = import.meta.env.VITE_MAP_IMAGE_URL ||
+                      'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=1200&auto=format&fit=crop';
+                    const linkUrl = 'https://maps.app.goo.gl/8Unj8f9CTGbz7c2S9';
+                    return (
+                      <>
+                        <img
+                          src={mapImageUrl}
+                          alt="Map location"
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Hover overlay */}
+                        <a
+                          href={linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Open in Google Maps"
+                        >
+                          <span className="flex items-center px-4 py-2 bg-white/90 text-gray-900 rounded-lg font-semibold shadow">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open in Maps
+                          </span>
+                        </a>
+                      </>
+                    );
+                  })()}
                 </div>
-                <p className="text-center text-sm text-gray-600 mt-4">Map placeholder</p>
+                <p className="text-center text-sm text-gray-600 mt-4">Hover over the map to open in Google Maps</p>
               </div>
             </motion.div>
           </div>

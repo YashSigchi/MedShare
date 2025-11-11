@@ -91,11 +91,13 @@ export const aiAPI = {
 };
 
 // Get base URL for serving static files (images)
-export const getImageUrl = (path: string) => {
-  if (!path) return undefined;
-  if (path.startsWith('http')) return path;
+export const getImageUrl = (path: string | undefined | null) => {
+  if (!path || path.trim() === '') return undefined;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
   const baseURL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-  return `${baseURL}${path}`;
+  // Ensure path starts with / if it doesn't already
+  const imagePath = path.startsWith('/') ? path : `/${path}`;
+  return `${baseURL}${imagePath}`;
 };
 
 export default api;

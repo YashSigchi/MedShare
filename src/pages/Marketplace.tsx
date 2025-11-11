@@ -108,8 +108,8 @@ function Marketplace() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="all">All Conditions</option>
-                    <option value="new">New Only</option>
-                    <option value="opened">Opened</option>
+                    <option value="New">New Only</option>
+                    <option value="Opened">Opened</option>
                   </select>
                 </div>
 

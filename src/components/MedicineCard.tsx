@@ -1,5 +1,6 @@
 import { Calendar, Package, MapPin, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 
 interface MedicineCardProps {
   id: string;
@@ -28,6 +29,8 @@ function MedicineCard({
   status,
   onRequest,
 }: MedicineCardProps) {
+  const [imageError, setImageError] = useState(false);
+
   const statusColors = {
     Pending: 'bg-yellow-100 text-yellow-700',
     Approved: 'bg-green-100 text-green-700',
@@ -47,8 +50,13 @@ function MedicineCard({
       className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 hover:border-blue-300 transition-all"
     >
       <div className="relative h-48 bg-gradient-to-br from-blue-50 to-green-50">
-        {imageUrl ? (
-          <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
+        {imageUrl && !imageError ? (
+          <img 
+            src={imageUrl} 
+            alt={name} 
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
         ) : (
           <div className="flex items-center justify-center h-full">
             <Package className="h-20 w-20 text-blue-300" />
