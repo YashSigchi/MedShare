@@ -63,9 +63,17 @@ function Upload() {
       formDataToSend.append('condition', formData.condition);
       formDataToSend.append('photo', selectedFile);
 
-      await medicineAPI.upload(formDataToSend);
-      setIsSubmitting(false);
-      setShowSuccess(true);
+      const response = await medicineAPI.upload(formDataToSend);
+setIsSubmitting(false);
+setShowSuccess(true);
+
+// ✅ Store AI result to show user feedback
+if (response?.data?.aiResult) {
+  const { status, reason } = response.data.aiResult;
+  localStorage.setItem("lastAIStatus", status);
+  localStorage.setItem("lastAIReason", reason);
+}
+
 
       setTimeout(() => {
         navigate('/dashboard');
@@ -115,8 +123,20 @@ function Upload() {
               </motion.div>
               <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Successful!</h2>
               <p className="text-gray-600 mb-6">
-                AI is verifying your upload. You'll be notified once it's approved by our team.
-              </p>
+  {localStorage.getItem("lastAIStatus") === "approved"
+    ? "✅ Your medicine was automatically approved by AI and is now visible on the marketplace!"
+    : localStorage.getItem("lastAIStatus") === "rejected"
+    ? "❌ Unfortunately, AI detected an issue with your upload and it was rejected."
+    : "🤖 AI is reviewing your medicine. A human verifier will confirm shortly."}
+</p>
+
+<div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+  <p className="text-sm text-blue-800">
+    <strong>AI Feedback:</strong>{" "}
+    {localStorage.getItem("lastAIReason") || "Processing details..."}
+  </p>
+</div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
                 <p className="text-sm text-blue-800">
                   <strong>What happens next?</strong>

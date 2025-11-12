@@ -51,19 +51,16 @@ const medicineSchema = new mongoose.Schema(
     verifiedAt: {
       type: Date,
     },
+
+    // 🧠 AI Verification Metadata
     aiVerification: {
-      expiryValid: {
-        type: Boolean,
-        default: false,
-      },
-      conditionGood: {
-        type: Boolean,
-        default: false,
-      },
-      confidence: {
-        type: Number,
-        default: 0,
-      },
+      expiryValid: { type: Boolean, default: false },
+      conditionGood: { type: Boolean, default: false },
+      confidence: { type: Number, default: 0 },
+      status: { type: String, default: 'unknown' }, // safe | expired | near-expiry | invalid
+      reason: { type: String, default: '' },
+      detectedExpiry: { type: String, default: '' },
+      aiCheckedAt: { type: Date },
     },
   },
   {
@@ -72,6 +69,4 @@ const medicineSchema = new mongoose.Schema(
 );
 
 const Medicine = mongoose.model('Medicine', medicineSchema);
-
 export default Medicine;
-

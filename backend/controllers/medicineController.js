@@ -2,6 +2,8 @@ import asyncHandler from 'express-async-handler';
 import Medicine from '../models/Medicine.js';
 import Notification from '../models/Notification.js';
 import User from '../models/User.js';
+import { analyzeMedicineImage } from "../services/aiMedicineChecker.js";
+
 
 // @desc    Upload medicine
 // @route   POST /api/medicines/upload
@@ -13,12 +15,25 @@ export const uploadMedicine = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Please provide all required fields' });
   }
 
-  // Check if file was uploaded
   if (!req.file) {
     return res.status(400).json({ message: 'Please upload a medicine photo' });
   }
 
   const photo = `/uploads/${req.file.filename}`;
+
+  // --- 🧠 Run AI Analysis before saving ---
+  const aiResult = await analyzeMedicineImage(photo, expiryDate);
+
+  // Auto-decide status
+  let finalStatus = 'Pending';
+  let notes = aiResult.reason || '';
+
+  if (aiResult.status === 'expired' || aiResult.confidence < 0.5) {
+    finalStatus = 'Rejected';
+    notes = `AI flagged issue: ${aiResult.reason}`;
+  } else if (aiResult.status === 'safe') {
+    finalStatus = 'Approved';
+  }
 
   const medicine = await Medicine.create({
     name,
@@ -28,22 +43,39 @@ export const uploadMedicine = asyncHandler(async (req, res) => {
     condition,
     photo,
     donor: req.user._id,
-    status: 'Pending',
+    status: finalStatus,
+    verificationNotes: notes,
+    aiVerification: {
+      expiryValid: aiResult.status === 'safe',
+      conditionGood: aiResult.status !== 'expired',
+      confidence: aiResult.confidence,
+      status: aiResult.status,
+      reason: aiResult.reason,
+      detectedExpiry: aiResult.detectedExpiry || '',
+      aiCheckedAt: new Date(),
+    },
   });
 
-  // Create notification for verifiers
-  const verifiers = await User.find({ role: 'Verifier' });
-  for (const verifier of verifiers) {
-    await Notification.create({
-      user: verifier._id,
-      message: `New medicine "${name}" uploaded and awaiting verification`,
-      type: 'info',
-      relatedMedicine: medicine._id,
-    });
+  // Notify verifiers if still pending
+  if (finalStatus === 'Pending') {
+    const verifiers = await User.find({ role: 'Verifier' });
+    for (const verifier of verifiers) {
+      await Notification.create({
+        user: verifier._id,
+        message: `New medicine "${name}" uploaded and awaiting verification`,
+        type: 'info',
+        relatedMedicine: medicine._id,
+      });
+    }
   }
 
-  res.status(201).json(medicine);
+  res.status(201).json({
+    message: `Medicine ${finalStatus.toLowerCase()} (${aiResult.status})`,
+    aiResult,
+    medicine,
+  });
 });
+
 
 // @desc    Get donor's uploads
 // @route   GET /api/medicines/myuploads

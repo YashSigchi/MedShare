@@ -1,7 +1,17 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, Shield, Calendar, Package, User, AlertCircle, Loader } from 'lucide-react';
-import { verifyAPI, getImageUrl } from '../utils/api';
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  CheckCircle,
+  XCircle,
+  Shield,
+  Calendar,
+  Package,
+  User,
+  AlertCircle,
+  Loader,
+  Info,
+} from "lucide-react";
+import { verifyAPI, getImageUrl } from "../utils/api";
 
 interface Medicine {
   id: string;
@@ -9,7 +19,7 @@ interface Medicine {
   manufacturer: string;
   expiryDate: string;
   quantity: number;
-  condition: 'New' | 'Opened';
+  condition: "New" | "Opened";
   imageUrl?: string;
   donorName: string;
   uploadDate: string;
@@ -17,6 +27,9 @@ interface Medicine {
     expiryValid: boolean;
     conditionGood: boolean;
     confidence: number;
+    status: string;
+    reason: string;
+    detectedExpiry: string;
   };
 }
 
@@ -25,8 +38,8 @@ function Verify() {
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
-  const [action, setAction] = useState<'approve' | 'reject' | null>(null);
-  const [verificationNotes, setVerificationNotes] = useState('');
+  const [action, setAction] = useState<"approve" | "reject" | null>(null);
+  const [verificationNotes, setVerificationNotes] = useState("");
 
   useEffect(() => {
     fetchMedicines();
@@ -40,27 +53,30 @@ function Verify() {
         id: med._id,
         name: med.name,
         manufacturer: med.manufacturer,
-        expiryDate: new Date(med.expiryDate).toISOString().split('T')[0],
+        expiryDate: new Date(med.expiryDate).toISOString().split("T")[0],
         quantity: med.quantity,
         condition: med.condition,
         imageUrl: getImageUrl(med.photo),
-        donorName: med.donor?.name || 'Unknown',
-        uploadDate: new Date(med.createdAt).toISOString().split('T')[0],
+        donorName: med.donor?.name || "Unknown",
+        uploadDate: new Date(med.createdAt).toISOString().split("T")[0],
         aiVerification: med.aiVerification || {
-          expiryValid: true,
-          conditionGood: true,
-          confidence: 85,
+          expiryValid: false,
+          conditionGood: false,
+          confidence: 0,
+          status: "unknown",
+          reason: "No AI data available.",
+          detectedExpiry: "",
         },
       }));
       setMedicines(formattedMedicines);
     } catch (error) {
-      console.error('Error fetching medicines:', error);
+      console.error("Error fetching medicines:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleAction = (medicine: Medicine, actionType: 'approve' | 'reject') => {
+  const handleAction = (medicine: Medicine, actionType: "approve" | "reject") => {
     setSelectedMedicine(medicine);
     setAction(actionType);
     setShowModal(true);
@@ -70,197 +86,151 @@ function Verify() {
     if (selectedMedicine && action) {
       try {
         await verifyAPI.verify(selectedMedicine.id, {
-          status: action === 'approve' ? 'Approved' : 'Rejected',
+          status: action === "approve" ? "Approved" : "Rejected",
           verificationNotes,
         });
-        setMedicines(medicines.filter((m) => m.id !== selectedMedicine.id));
+        setMedicines((prev) => prev.filter((m) => m.id !== selectedMedicine.id));
         setShowModal(false);
         setSelectedMedicine(null);
         setAction(null);
-        setVerificationNotes('');
+        setVerificationNotes("");
       } catch (error) {
-        console.error('Error verifying medicine:', error);
-        alert('Failed to verify medicine. Please try again.');
+        console.error("Error verifying medicine:", error);
+        alert("Failed to verify medicine. Please try again.");
       }
     }
   };
 
-  const stats = [
-    { label: 'Pending Reviews', value: medicines.length.toString(), color: 'yellow' },
-    { label: 'Approved Today', value: '12', color: 'green' },
-    { label: 'Rejected Today', value: '2', color: 'red' },
-    { label: 'Success Rate', value: '94%', color: 'blue' },
-  ];
+  const statusColor = (status: string) => {
+    switch (status) {
+      case "safe":
+        return "text-green-600";
+      case "near-expiry":
+        return "text-yellow-600";
+      case "expired":
+        return "text-red-600";
+      case "invalid":
+        return "text-gray-600";
+      default:
+        return "text-blue-600";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Verification Dashboard</h1>
-          <p className="text-gray-600">Review and verify medicine donations with AI assistance</p>
+          <p className="text-gray-600">
+            Review and verify medicine donations with integrated AI assistance
+          </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-xl shadow-md p-6 border border-gray-200"
-            >
-              <p className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</p>
-              <p className="text-sm text-gray-600">{stat.label}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden"
-        >
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900">Pending Verifications</h2>
+        {isLoading ? (
+          <div className="p-12 text-center">
+            <Loader className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" />
+            <p className="text-gray-600">Loading pending medicines...</p>
           </div>
-
-          {isLoading ? (
-            <div className="p-12 text-center">
-              <Loader className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" />
-              <p className="text-gray-600">Loading pending medicines...</p>
-            </div>
-          ) : medicines.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-gray-600">No pending verifications</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {medicines.map((medicine) => (
+        ) : medicines.length === 0 ? (
+          <div className="p-12 text-center text-gray-600">No pending verifications</div>
+        ) : (
+          <div className="grid gap-6">
+            {medicines.map((medicine) => (
               <motion.div
                 key={medicine.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="p-6 hover:bg-gray-50 transition-colors"
+                className="bg-white shadow-md border border-gray-200 rounded-xl p-6 hover:shadow-lg transition"
               >
                 <div className="grid lg:grid-cols-12 gap-6">
                   <div className="lg:col-span-3">
-                    <div className="h-48 bg-gradient-to-br from-blue-50 to-green-50 rounded-lg overflow-hidden">
-                      {medicine.imageUrl ? (
-                        <img
-                          src={medicine.imageUrl}
-                          alt={medicine.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <Package className="h-20 w-20 text-blue-300" />
-                        </div>
-                      )}
-                    </div>
+                    <img
+                      src={medicine.imageUrl || "/placeholder.jpg"}
+                      alt={medicine.name}
+                      className="w-full h-48 object-cover rounded-lg border"
+                    />
                   </div>
 
-                  <div className="lg:col-span-6 space-y-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{medicine.name}</h3>
-                      <p className="text-gray-600">{medicine.manufacturer}</p>
+                  <div className="lg:col-span-6 space-y-3">
+                    <h3 className="text-xl font-bold text-gray-900">{medicine.name}</h3>
+                    <p className="text-gray-600">{medicine.manufacturer}</p>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
+                      <span>
+                        <Calendar className="inline h-4 w-4 mr-1 text-blue-500" />
+                        Expires: {medicine.expiryDate}
+                      </span>
+                      <span>
+                        <Package className="inline h-4 w-4 mr-1 text-blue-500" />
+                        Qty: {medicine.quantity}
+                      </span>
+                      <span>
+                        <User className="inline h-4 w-4 mr-1 text-blue-500" />
+                        Donor: {medicine.donorName}
+                      </span>
+                      <span>
+                        <Calendar className="inline h-4 w-4 mr-1 text-blue-500" />
+                        Uploaded: {medicine.uploadDate}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2 text-blue-500" />
-                        <span>Expires: {medicine.expiryDate}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Package className="h-4 w-4 mr-2 text-blue-500" />
-                        <span>Qty: {medicine.quantity}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <User className="h-4 w-4 mr-2 text-blue-500" />
-                        <span>{medicine.donorName}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2 text-blue-500" />
-                        <span>Uploaded: {medicine.uploadDate}</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
                       <div className="flex items-center mb-3">
                         <Shield className="h-5 w-5 text-blue-600 mr-2" />
-                        <span className="font-semibold text-gray-900">AI Verification Results</span>
+                        <span className="font-semibold text-gray-900">AI Verification</span>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700">Expiry Date Valid:</span>
-                          <span className={`flex items-center text-sm font-semibold ${medicine.aiVerification.expiryValid ? 'text-green-600' : 'text-red-600'}`}>
-                            {medicine.aiVerification.expiryValid ? (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Valid
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Invalid
-                              </>
-                            )}
+
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Status:</span>
+                          <span className={`font-semibold ${statusColor(medicine.aiVerification.status)}`}>
+                            {medicine.aiVerification.status?.toUpperCase() || "N/A"}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700">Condition:</span>
-                          <span className={`flex items-center text-sm font-semibold ${medicine.aiVerification.conditionGood ? 'text-green-600' : 'text-red-600'}`}>
-                            {medicine.aiVerification.conditionGood ? (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Good
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Poor
-                              </>
-                            )}
+
+                        {medicine.aiVerification.detectedExpiry && (
+                          <div className="flex justify-between">
+                            <span>Detected Expiry:</span>
+                            <span className="font-semibold text-gray-700">
+                              {medicine.aiVerification.detectedExpiry}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between">
+                          <span>Confidence:</span>
+                          <span className="font-semibold text-blue-600">
+                            {(medicine.aiVerification.confidence * 100).toFixed(0)}%
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700">AI Confidence:</span>
-                          <span className="text-sm font-semibold text-blue-600">
-                            {medicine.aiVerification.confidence}%
-                          </span>
+
+                        <div className="flex items-start gap-2 pt-2">
+                          <Info className="h-4 w-4 text-blue-400 mt-0.5" />
+                          <span className="text-gray-700">{medicine.aiVerification.reason}</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="lg:col-span-3 flex flex-col justify-center space-y-3">
+                  <div className="lg:col-span-3 flex flex-col justify-center gap-3">
                     <button
-                      onClick={() => handleAction(medicine, 'approve')}
-                      className="flex items-center justify-center py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors"
+                      onClick={() => handleAction(medicine, "approve")}
+                      className="flex items-center justify-center py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition"
                     >
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      Approve
+                      <CheckCircle className="h-5 w-5 mr-2" /> Approve
                     </button>
                     <button
-                      onClick={() => handleAction(medicine, 'reject')}
-                      className="flex items-center justify-center py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+                      onClick={() => handleAction(medicine, "reject")}
+                      className="flex items-center justify-center py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
                     >
-                      <XCircle className="h-5 w-5 mr-2" />
-                      Reject
+                      <XCircle className="h-5 w-5 mr-2" /> Reject
                     </button>
                   </div>
                 </div>
               </motion.div>
             ))}
-            </div>
-          )}
-        </motion.div>
+          </div>
+        )}
       </div>
 
       {showModal && selectedMedicine && (
@@ -271,20 +241,24 @@ function Verify() {
             className="bg-white rounded-xl p-8 max-w-md w-full"
           >
             <div className="text-center mb-6">
-              <div className={`w-16 h-16 ${action === 'approve' ? 'bg-green-100' : 'bg-red-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
-                {action === 'approve' ? (
+              <div
+                className={`w-16 h-16 ${
+                  action === "approve" ? "bg-green-100" : "bg-red-100"
+                } rounded-full flex items-center justify-center mx-auto mb-4`}
+              >
+                {action === "approve" ? (
                   <CheckCircle className="h-8 w-8 text-green-600" />
                 ) : (
                   <AlertCircle className="h-8 w-8 text-red-600" />
                 )}
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                {action === 'approve' ? 'Approve Donation?' : 'Reject Donation?'}
+                {action === "approve" ? "Approve Donation?" : "Reject Donation?"}
               </h3>
               <p className="text-gray-600">
-                {action === 'approve'
-                  ? `You are about to approve ${selectedMedicine.name}. This will make it available in the marketplace.`
-                  : `You are about to reject ${selectedMedicine.name}. The donor will be notified of this decision.`}
+                {action === "approve"
+                  ? `Approve ${selectedMedicine.name} for marketplace listing.`
+                  : `Reject ${selectedMedicine.name}. The donor will be notified.`}
               </p>
               <div className="mt-4">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -295,20 +269,22 @@ function Verify() {
                   onChange={(e) => setVerificationNotes(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={3}
-                  placeholder="Add any notes about this verification..."
+                  placeholder="Add any notes..."
                 />
               </div>
             </div>
             <div className="flex gap-4">
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-all"
+                className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmAction}
-                className={`flex-1 py-3 ${action === 'approve' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} text-white rounded-lg font-semibold transition-all`}
+                className={`flex-1 py-3 ${
+                  action === "approve" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+                } text-white rounded-lg font-semibold`}
               >
                 Confirm
               </button>
